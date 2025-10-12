@@ -1,0 +1,4 @@
+project_id = "hlblzdlhjtnqmusiapeo"
+
+[functions.merge-images]
+verify_jwt = false
