@@ -2,15 +2,39 @@ import { useState } from "react";
 import { ImageUpload } from "@/components/ImageUpload";
 import { MergeButton } from "@/components/MergeButton";
 import { ResultDisplay } from "@/components/ResultDisplay";
+import { ModelCreator, ModelCharacteristics } from "@/components/ModelCreator";
+import { SavedModels } from "@/components/SavedModels";
+import { SaveModelDialog } from "@/components/SaveModelDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Save } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Index = () => {
   const [modelImage, setModelImage] = useState<string>("");
   const [productImage, setProductImage] = useState<string>("");
   const [mergedImage, setMergedImage] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [currentCharacteristics, setCurrentCharacteristics] = useState<ModelCharacteristics | null>(null);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [savedModelsKey, setSavedModelsKey] = useState(0);
+
+  const handleModelGenerated = (imageUrl: string, characteristics: ModelCharacteristics) => {
+    setModelImage(imageUrl);
+    setCurrentCharacteristics(characteristics);
+    toast.success("Modelo gerado com sucesso!");
+  };
+
+  const handleSaveModel = () => {
+    if (modelImage && currentCharacteristics) {
+      setShowSaveDialog(true);
+    }
+  };
+
+  const handleModelSaved = () => {
+    setSavedModelsKey(prev => prev + 1);
+  };
 
   const handleMerge = async () => {
     if (!modelImage || !productImage) {
@@ -82,43 +106,89 @@ const Index = () => {
         </div>
 
         {/* Main Content */}
-        <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            {/* Upload Cards */}
-            <div className="p-6 rounded-2xl bg-gradient-card backdrop-blur-sm border border-border shadow-card transition-all duration-300 hover:shadow-primary/20">
-              <ImageUpload
-                label="Imagem da Modelo"
-                onImageSelect={setModelImage}
-                currentImage={modelImage}
-              />
-            </div>
+        <div className="max-w-7xl mx-auto">
+          <Tabs defaultValue="create" className="space-y-8">
+            <TabsList className="grid w-full max-w-md mx-auto grid-cols-2">
+              <TabsTrigger value="create">Criar Modelo</TabsTrigger>
+              <TabsTrigger value="saved">Modelos Salvos</TabsTrigger>
+            </TabsList>
 
-            <div className="p-6 rounded-2xl bg-gradient-card backdrop-blur-sm border border-border shadow-card transition-all duration-300 hover:shadow-primary/20">
-              <ImageUpload
-                label="Imagem do Produto"
-                onImageSelect={setProductImage}
-                currentImage={productImage}
-              />
-            </div>
-          </div>
+            <TabsContent value="create" className="space-y-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Model Creator */}
+                <ModelCreator onModelGenerated={handleModelGenerated} />
 
-          {/* Merge Button */}
-          <div className="mb-12">
-            <MergeButton
-              onClick={handleMerge}
-              disabled={!modelImage || !productImage}
-              loading={loading}
-            />
-          </div>
+                {/* Model Preview */}
+                <div className="p-6 rounded-2xl bg-gradient-card backdrop-blur-sm border border-border shadow-card">
+                  <ImageUpload
+                    label="Modelo Gerado"
+                    onImageSelect={setModelImage}
+                    currentImage={modelImage}
+                  />
+                  {modelImage && (
+                    <Button
+                      onClick={handleSaveModel}
+                      className="w-full mt-4"
+                      variant="outline"
+                    >
+                      <Save className="w-4 h-4 mr-2" />
+                      Salvar Modelo
+                    </Button>
+                  )}
+                </div>
+              </div>
 
-          {/* Result Display */}
-          {mergedImage && (
-            <div className="p-8 rounded-2xl bg-gradient-card backdrop-blur-sm border border-border shadow-card">
-              <ResultDisplay imageUrl={mergedImage} />
-            </div>
-          )}
+              {/* Product Upload and Merge */}
+              {modelImage && (
+                <div className="space-y-8 animate-in fade-in-50 duration-500">
+                  <div className="p-6 rounded-2xl bg-gradient-card backdrop-blur-sm border border-border shadow-card max-w-md mx-auto">
+                    <ImageUpload
+                      label="Imagem do Produto"
+                      onImageSelect={setProductImage}
+                      currentImage={productImage}
+                    />
+                  </div>
+
+                  <div className="max-w-md mx-auto">
+                    <MergeButton
+                      onClick={handleMerge}
+                      disabled={!modelImage || !productImage}
+                      loading={loading}
+                    />
+                  </div>
+
+                  {mergedImage && (
+                    <div className="p-8 rounded-2xl bg-gradient-card backdrop-blur-sm border border-border shadow-card max-w-2xl mx-auto">
+                      <ResultDisplay imageUrl={mergedImage} />
+                    </div>
+                  )}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="saved">
+              <div className="p-6 rounded-2xl bg-gradient-card backdrop-blur-sm border border-border shadow-card">
+                <h2 className="text-2xl font-semibold mb-6">Modelos Salvos</h2>
+                <SavedModels 
+                  key={savedModelsKey}
+                  onSelectModel={setModelImage}
+                  selectedModelImage={modelImage}
+                />
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
+
+      {currentCharacteristics && (
+        <SaveModelDialog
+          open={showSaveDialog}
+          onOpenChange={setShowSaveDialog}
+          imageUrl={modelImage}
+          characteristics={currentCharacteristics}
+          onSaved={handleModelSaved}
+        />
+      )}
     </div>
   );
 };

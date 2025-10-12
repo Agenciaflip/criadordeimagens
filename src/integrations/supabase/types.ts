@@ -14,7 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      models: {
+        Row: {
+          age_range: string
+          body_type: string
+          created_at: string
+          ethnicity: string
+          gender: string
+          hair_color: string
+          hair_style: string
+          id: string
+          image_url: string
+          name: string
+          skin_tone: string
+          updated_at: string
+        }
+        Insert: {
+          age_range: string
+          body_type: string
+          created_at?: string
+          ethnicity: string
+          gender: string
+          hair_color: string
+          hair_style: string
+          id?: string
+          image_url: string
+          name: string
+          skin_tone: string
+          updated_at?: string
+        }
+        Update: {
+          age_range?: string
+          body_type?: string
+          created_at?: string
+          ethnicity?: string
+          gender?: string
+          hair_color?: string
+          hair_style?: string
+          id?: string
+          image_url?: string
+          name?: string
+          skin_tone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
