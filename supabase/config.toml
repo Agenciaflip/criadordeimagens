@@ -5,3 +5,15 @@ verify_jwt = false
 
 [functions.generate-model]
 verify_jwt = false
+
+[functions.generate-clothing]
+verify_jwt = false
+
+[functions.generate-marketplace-content]
+verify_jwt = false
+
+[functions.generate-color-variations]
+verify_jwt = false
+
+[functions.generate-pose-pack]
+verify_jwt = false

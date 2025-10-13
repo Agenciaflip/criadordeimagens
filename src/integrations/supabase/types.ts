@@ -14,6 +14,139 @@ export type Database = {
   }
   public: {
     Tables: {
+      clothing_items: {
+        Row: {
+          color: string | null
+          created_at: string
+          fabric: string | null
+          id: string
+          image_url: string
+          name: string
+          pattern: string | null
+          style: string | null
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          fabric?: string | null
+          id?: string
+          image_url: string
+          name: string
+          pattern?: string | null
+          style?: string | null
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          fabric?: string | null
+          id?: string
+          image_url?: string
+          name?: string
+          pattern?: string | null
+          style?: string | null
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clothing_items_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creations: {
+        Row: {
+          clothing_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string
+          is_variation: boolean | null
+          lighting: string | null
+          model_id: string | null
+          parent_creation_id: string | null
+          pose: string | null
+          scenario: string | null
+          style: string | null
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          clothing_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url: string
+          is_variation?: boolean | null
+          lighting?: string | null
+          model_id?: string | null
+          parent_creation_id?: string | null
+          pose?: string | null
+          scenario?: string | null
+          style?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          clothing_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string
+          is_variation?: boolean | null
+          lighting?: string | null
+          model_id?: string | null
+          parent_creation_id?: string | null
+          pose?: string | null
+          scenario?: string | null
+          style?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creations_clothing_id_fkey"
+            columns: ["clothing_id"]
+            isOneToOne: false
+            referencedRelation: "clothing_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creations_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "models"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creations_parent_creation_id_fkey"
+            columns: ["parent_creation_id"]
+            isOneToOne: false
+            referencedRelation: "creations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       models: {
         Row: {
           age_range: string
@@ -28,6 +161,7 @@ export type Database = {
           name: string
           skin_tone: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           age_range: string
@@ -42,6 +176,7 @@ export type Database = {
           name: string
           skin_tone: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           age_range?: string
@@ -56,6 +191,63 @@ export type Database = {
           name?: string
           skin_tone?: string
           updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "models_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
         }
         Relationships: []
       }
@@ -64,10 +256,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "moderator" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -194,6 +392,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "moderator", "user"],
+    },
   },
 } as const

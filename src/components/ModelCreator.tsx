@@ -4,6 +4,8 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Sparkles, Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface ModelCreatorProps {
   onModelGenerated: (imageUrl: string, characteristics: ModelCharacteristics) => void;
@@ -38,6 +40,12 @@ export const ModelCreator = ({ onModelGenerated }: ModelCreatorProps) => {
   const handleGenerate = async () => {
     setLoading(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Você precisa estar autenticado");
+        return;
+      }
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-model`,
         {
@@ -57,6 +65,7 @@ export const ModelCreator = ({ onModelGenerated }: ModelCreatorProps) => {
       onModelGenerated(data.modelImage, characteristics);
     } catch (error) {
       console.error('Erro:', error);
+      toast.error('Erro ao gerar modelo');
     } finally {
       setLoading(false);
     }
