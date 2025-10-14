@@ -14,7 +14,7 @@ serve(async (req) => {
   try {
     console.log('Starting image merge process...');
     
-    const { modelImage, productImage, prompt } = await req.json();
+    const { modelImage, productImage, prompt, sceneSettings } = await req.json();
     
     if (!modelImage || !productImage) {
       console.error('Missing required images');
@@ -33,8 +33,62 @@ serve(async (req) => {
       );
     }
 
-    const mergePrompt = prompt || 
-      'Merge these two images seamlessly. Place the product on the model in a natural and realistic way. Ensure proper lighting, shadows, and perspective to make the composition look professional and believable.';
+    // Build dynamic prompt based on scene settings
+    let mergePrompt = 'Professional fashion photography. ';
+    
+    if (sceneSettings) {
+      const { pose, scenario, lighting, style } = sceneSettings;
+      
+      if (pose) {
+        const poseDescriptions: Record<string, string> = {
+          'frontal': 'full frontal view',
+          'lateral': 'side profile view',
+          '3-4': '3/4 angle view',
+          'costas': 'back view',
+          'sentado': 'seated pose',
+          'caminhando': 'walking pose'
+        };
+        mergePrompt += `Model in ${poseDescriptions[pose] || pose} pose. `;
+      }
+      
+      if (scenario) {
+        const scenarioDescriptions: Record<string, string> = {
+          'studio': 'professional studio setting',
+          'rua': 'urban street environment',
+          'praia': 'beach setting with sand',
+          'parque': 'outdoor park environment',
+          'indoor': 'indoor home setting',
+          'white-background': 'clean white background'
+        };
+        mergePrompt += `Shot in ${scenarioDescriptions[scenario] || scenario}. `;
+      }
+      
+      if (lighting) {
+        const lightingDescriptions: Record<string, string> = {
+          'studio': 'professional studio lighting',
+          'natural': 'natural daylight',
+          'dramatica': 'dramatic high-contrast lighting',
+          'golden-hour': 'warm golden hour lighting',
+          'soft': 'soft diffused lighting'
+        };
+        mergePrompt += `With ${lightingDescriptions[lighting] || lighting}. `;
+      }
+      
+      if (style) {
+        const styleDescriptions: Record<string, string> = {
+          'editorial': 'editorial magazine style',
+          'comercial': 'commercial catalog style',
+          'casual': 'casual lifestyle style',
+          'lifestyle': 'natural lifestyle photography',
+          'high-fashion': 'high fashion runway style'
+        };
+        mergePrompt += `${styleDescriptions[style] || style} photography. `;
+      }
+    }
+    
+    mergePrompt += prompt || 'Merge the clothing item onto the model seamlessly. Ensure realistic fit, proper lighting, shadows, and perspective. The result should look natural and professional.';
+    
+    console.log('Generated prompt:', mergePrompt);
 
     console.log('Calling Lovable AI for image generation...');
     
