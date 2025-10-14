@@ -6,13 +6,16 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Sparkles, ArrowLeft, ArrowRight, Save } from "lucide-react";
+import { Loader2, Sparkles, ArrowLeft, ArrowRight, Save, FileText, Palette, Camera } from "lucide-react";
 import { ModelCreator, ModelCharacteristics } from "./ModelCreator";
 import { SavedModels } from "./SavedModels";
 import { ClothingCreator, ClothingCharacteristics } from "./ClothingCreator";
 import { SavedClothing } from "./SavedClothing";
 import { SaveModelDialog } from "./SaveModelDialog";
 import { SaveClothingDialog } from "./SaveClothingDialog";
+import { MarketplaceContentGenerator } from "./MarketplaceContentGenerator";
+import { ColorVariationsGenerator } from "./ColorVariationsGenerator";
+import { PosePackGenerator } from "./PosePackGenerator";
 
 type Step = "model" | "clothing" | "scene" | "result";
 
@@ -44,12 +47,16 @@ export const CreationWorkflow = () => {
   });
   
   const [generatedImage, setGeneratedImage] = useState("");
+  const [generatedCreationId, setGeneratedCreationId] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
   
   const [showSaveModelDialog, setShowSaveModelDialog] = useState(false);
   const [showSaveClothingDialog, setShowSaveClothingDialog] = useState(false);
+  const [showMarketplaceGenerator, setShowMarketplaceGenerator] = useState(false);
+  const [showColorVariations, setShowColorVariations] = useState(false);
+  const [showPosePack, setShowPosePack] = useState(false);
 
   const handleModelGenerated = (imageUrl: string, characteristics: ModelCharacteristics) => {
     setModelImage(imageUrl);
@@ -100,7 +107,7 @@ export const CreationWorkflow = () => {
         // Salvar criação no banco
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          await supabase.from("creations").insert({
+          const { data: creationData } = await supabase.from("creations").insert({
             user_id: user.id,
             model_id: selectedModelId,
             clothing_id: selectedClothingId,
@@ -109,7 +116,11 @@ export const CreationWorkflow = () => {
             scenario: sceneSettings.scenario,
             lighting: sceneSettings.lighting,
             style: sceneSettings.style,
-          });
+          }).select().single();
+          
+          if (creationData) {
+            setGeneratedCreationId(creationData.id);
+          }
         }
         
         setStep("result");
@@ -128,10 +139,24 @@ export const CreationWorkflow = () => {
     setModelImage("");
     setClothingImage("");
     setGeneratedImage("");
+    setGeneratedCreationId("");
     setTitle("");
     setDescription("");
     setUseExistingModel(false);
     setUseExistingClothing(false);
+  };
+
+  const handleContentGenerated = async (newTitle: string, newDescription: string) => {
+    setTitle(newTitle);
+    setDescription(newDescription);
+    
+    // Atualizar no banco
+    if (generatedCreationId) {
+      await supabase.from("creations").update({
+        title: newTitle,
+        description: newDescription
+      }).eq("id", generatedCreationId);
+    }
   };
 
   return (
@@ -370,11 +395,38 @@ export const CreationWorkflow = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="space-y-4">
               <img src={generatedImage} alt="Resultado" className="w-full rounded-lg" />
+              
+              <div className="grid grid-cols-3 gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowColorVariations(true)}
+                >
+                  <Palette className="mr-2 h-4 w-4" />
+                  Cores
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowPosePack(true)}
+                >
+                  <Camera className="mr-2 h-4 w-4" />
+                  5 Poses
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowMarketplaceGenerator(true)}
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  Conteúdo
+                </Button>
+              </div>
             </div>
 
             <div className="space-y-4">
               <div>
-                <Label>Título (opcional)</Label>
+                <Label>Título</Label>
                 <Input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
@@ -383,7 +435,7 @@ export const CreationWorkflow = () => {
               </div>
 
               <div>
-                <Label>Descrição (opcional)</Label>
+                <Label>Descrição</Label>
                 <Textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
@@ -422,6 +474,27 @@ export const CreationWorkflow = () => {
           onSaved={() => {}}
         />
       )}
+
+      <MarketplaceContentGenerator
+        open={showMarketplaceGenerator}
+        onOpenChange={setShowMarketplaceGenerator}
+        creationId={generatedCreationId}
+        currentTitle={title}
+        currentDescription={description}
+        onContentGenerated={handleContentGenerated}
+      />
+
+      <ColorVariationsGenerator
+        open={showColorVariations}
+        onOpenChange={setShowColorVariations}
+        clothingImage={clothingImage}
+      />
+
+      <PosePackGenerator
+        open={showPosePack}
+        onOpenChange={setShowPosePack}
+        creationId={generatedCreationId}
+      />
     </div>
   );
 };
