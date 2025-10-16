@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,13 +20,29 @@ serve(async (req) => {
   }
 
   try {
-    const { originalImageUrl } = await req.json();
+    const { creationId } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Buscar a criação original
+    const { data: creation, error: fetchError } = await supabase
+      .from('creations')
+      .select('image_url')
+      .eq('id', creationId)
+      .single();
+
+    if (fetchError || !creation) {
+      throw new Error('Criação não encontrada');
+    }
+
+    const originalImageUrl = creation.image_url;
     console.log('Gerando pack de 5 poses...');
 
     const poseImages = [];
@@ -76,7 +93,9 @@ High quality, detailed, realistic.`;
     console.log(`${poseImages.length} poses geradas com sucesso`);
 
     return new Response(
-      JSON.stringify({ poses: poseImages }),
+      JSON.stringify({ 
+        poses: poseImages.map(p => p.imageUrl)
+      }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200 

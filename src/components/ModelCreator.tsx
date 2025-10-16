@@ -2,10 +2,12 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Sparkles, Loader2 } from "lucide-react";
+import { Sparkles, Loader2, Upload } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { ImageUpload } from "./ImageUpload";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface ModelCreatorProps {
   onModelGenerated: (imageUrl: string, characteristics: ModelCharacteristics) => void;
@@ -75,10 +77,31 @@ export const ModelCreator = ({ onModelGenerated }: ModelCreatorProps) => {
     <div className="space-y-6 p-6 rounded-2xl bg-gradient-card backdrop-blur-sm border border-border shadow-card">
       <div className="flex items-center gap-2 mb-4">
         <Sparkles className="w-5 h-5 text-primary" />
-        <h2 className="text-xl font-semibold">Criar Modelo com IA</h2>
+        <h2 className="text-xl font-semibold">Escolher Modelo</h2>
       </div>
 
-      <div className="space-y-4">
+      <Tabs defaultValue="generate" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="generate">
+            <Sparkles className="w-4 h-4 mr-2" />
+            Gerar com IA
+          </TabsTrigger>
+          <TabsTrigger value="upload">
+            <Upload className="w-4 h-4 mr-2" />
+            Fazer Upload
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="upload" className="space-y-4">
+          <ImageUpload
+            label="Upload da Foto do Modelo"
+            onImageSelect={(url) => {
+              onModelGenerated(url, characteristics);
+            }}
+          />
+        </TabsContent>
+
+        <TabsContent value="generate" className="space-y-4">
         {/* Gênero */}
         <div className="space-y-2">
           <Label>Gênero</Label>
@@ -194,24 +217,25 @@ export const ModelCreator = ({ onModelGenerated }: ModelCreatorProps) => {
           </Select>
         </div>
 
-        <Button 
-          onClick={handleGenerate} 
-          disabled={loading}
-          className="w-full"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Gerando Modelo...
-            </>
-          ) : (
-            <>
-              <Sparkles className="w-4 h-4 mr-2" />
-              Gerar Modelo
-            </>
-          )}
-        </Button>
-      </div>
+          <Button 
+            onClick={handleGenerate} 
+            disabled={loading}
+            className="w-full"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Gerando Modelo...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 mr-2" />
+                Gerar Modelo
+              </>
+            )}
+          </Button>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

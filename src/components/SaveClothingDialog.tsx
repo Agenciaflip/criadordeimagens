@@ -24,7 +24,7 @@ export const SaveClothingDialog = ({
   onSaved,
 }: SaveClothingDialogProps) => {
   const [saving, setSaving] = useState(false);
-  const [name, setName] = useState(characteristics.name);
+  const [name, setName] = useState("");
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -37,14 +37,17 @@ export const SaveClothingDialog = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
+      // Extract basic info from description
+      const description = characteristics.description || "";
+      
       const { error } = await supabase.from("clothing_items").insert({
         user_id: user.id,
         name: name.trim(),
-        type: characteristics.type,
-        color: characteristics.color,
-        style: characteristics.style,
-        pattern: characteristics.pattern,
-        fabric: characteristics.fabric,
+        type: "geral",
+        color: "variado",
+        style: "personalizado",
+        pattern: "conforme descrição",
+        fabric: "conforme descrição",
         image_url: imageUrl,
       });
 

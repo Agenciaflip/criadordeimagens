@@ -1,19 +1,15 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2, Sparkles, Upload, Scissors } from "lucide-react";
+import { ImageUpload } from "./ImageUpload";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export interface ClothingCharacteristics {
-  name: string;
-  type: string;
-  color: string;
-  style: string;
-  pattern: string;
-  fabric: string;
+  description: string;
 }
 
 interface ClothingCreatorProps {
@@ -22,22 +18,14 @@ interface ClothingCreatorProps {
 
 export const ClothingCreator = ({ onClothingGenerated }: ClothingCreatorProps) => {
   const [loading, setLoading] = useState(false);
+  const [extracting, setExtracting] = useState(false);
   const [characteristics, setCharacteristics] = useState<ClothingCharacteristics>({
-    name: "",
-    type: "camiseta",
-    color: "branco",
-    style: "casual",
-    pattern: "liso",
-    fabric: "algodão",
+    description: "",
   });
 
-  const updateCharacteristic = (key: keyof ClothingCharacteristics, value: string) => {
-    setCharacteristics(prev => ({ ...prev, [key]: value }));
-  };
-
   const handleGenerate = async () => {
-    if (!characteristics.name.trim()) {
-      toast.error("Por favor, insira um nome para a peça");
+    if (!characteristics.description.trim()) {
+      toast.error("Por favor, descreva a peça de roupa");
       return;
     }
 
@@ -60,118 +48,106 @@ export const ClothingCreator = ({ onClothingGenerated }: ClothingCreatorProps) =
     }
   };
 
+  const handleExtractClothing = async (uploadedImageUrl: string) => {
+    setExtracting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('extract-clothing', {
+        body: { imageUrl: uploadedImageUrl }
+      });
+
+      if (error) throw error;
+
+      if (data?.imageUrl) {
+        onClothingGenerated(data.imageUrl, { description: "Peça extraída de foto" });
+        toast.success("Peça extraída com sucesso!");
+      }
+    } catch (error: any) {
+      console.error("Erro ao extrair peça:", error);
+      toast.error("Erro ao extrair peça da foto");
+    } finally {
+      setExtracting(false);
+    }
+  };
+
   return (
     <div className="p-6 rounded-2xl bg-gradient-card backdrop-blur-sm border border-border shadow-card space-y-4">
       <div className="flex items-center gap-2 mb-4">
         <Sparkles className="w-5 h-5 text-primary" />
-        <h3 className="text-lg font-semibold">Criar Peça de Roupa</h3>
+        <h3 className="text-lg font-semibold">Escolher Peça de Roupa</h3>
       </div>
 
-      <div className="space-y-4">
-        <div>
-          <Label>Nome da Peça</Label>
-          <Input
-            value={characteristics.name}
-            onChange={(e) => updateCharacteristic("name", e.target.value)}
-            placeholder="Ex: Camiseta Básica Branca"
+      <Tabs defaultValue="generate" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="generate">
+            <Sparkles className="w-4 h-4 mr-2" />
+            Gerar com IA
+          </TabsTrigger>
+          <TabsTrigger value="extract">
+            <Scissors className="w-4 h-4 mr-2" />
+            Extrair de Foto
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="extract" className="space-y-4">
+          <div className="p-4 bg-muted/50 rounded-lg mb-4">
+            <p className="text-sm text-muted-foreground">
+              <strong>Como funciona:</strong> Faça upload de uma foto onde apareça a peça de roupa 
+              (pode estar em modelo, manequim, ou cabide). A IA irá extrair a peça e colocá-la 
+              em um fundo branco profissional.
+            </p>
+          </div>
+          
+          <ImageUpload
+            label="Upload da Foto com a Peça de Roupa"
+            onImageSelect={handleExtractClothing}
           />
-        </div>
-
-        <div>
-          <Label>Tipo</Label>
-          <Select value={characteristics.type} onValueChange={(v) => updateCharacteristic("type", v)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="camiseta">Camiseta</SelectItem>
-              <SelectItem value="calça">Calça</SelectItem>
-              <SelectItem value="vestido">Vestido</SelectItem>
-              <SelectItem value="jaqueta">Jaqueta</SelectItem>
-              <SelectItem value="saia">Saia</SelectItem>
-              <SelectItem value="shorts">Shorts</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <Label>Cor</Label>
-          <Select value={characteristics.color} onValueChange={(v) => updateCharacteristic("color", v)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="branco">Branco</SelectItem>
-              <SelectItem value="preto">Preto</SelectItem>
-              <SelectItem value="azul">Azul</SelectItem>
-              <SelectItem value="vermelho">Vermelho</SelectItem>
-              <SelectItem value="verde">Verde</SelectItem>
-              <SelectItem value="amarelo">Amarelo</SelectItem>
-              <SelectItem value="cinza">Cinza</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <Label>Estilo</Label>
-          <Select value={characteristics.style} onValueChange={(v) => updateCharacteristic("style", v)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="casual">Casual</SelectItem>
-              <SelectItem value="formal">Formal</SelectItem>
-              <SelectItem value="esportivo">Esportivo</SelectItem>
-              <SelectItem value="elegante">Elegante</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <Label>Padrão</Label>
-          <Select value={characteristics.pattern} onValueChange={(v) => updateCharacteristic("pattern", v)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="liso">Liso</SelectItem>
-              <SelectItem value="estampado">Estampado</SelectItem>
-              <SelectItem value="listrado">Listrado</SelectItem>
-              <SelectItem value="xadrez">Xadrez</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <Label>Tecido</Label>
-          <Select value={characteristics.fabric} onValueChange={(v) => updateCharacteristic("fabric", v)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="algodão">Algodão</SelectItem>
-              <SelectItem value="jeans">Jeans</SelectItem>
-              <SelectItem value="seda">Seda</SelectItem>
-              <SelectItem value="poliéster">Poliéster</SelectItem>
-              <SelectItem value="linho">Linho</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <Button onClick={handleGenerate} disabled={loading} className="w-full">
-          {loading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Gerando...
-            </>
-          ) : (
-            <>
-              <Sparkles className="mr-2 h-4 w-4" />
-              Gerar Peça
-            </>
+          
+          {extracting && (
+            <div className="flex items-center justify-center p-4">
+              <Loader2 className="w-6 h-6 animate-spin mr-2" />
+              <span className="text-sm">Extraindo peça de roupa...</span>
+            </div>
           )}
-        </Button>
-      </div>
+        </TabsContent>
+
+        <TabsContent value="generate" className="space-y-4">
+          <div className="p-4 bg-muted/50 rounded-lg mb-4">
+            <p className="text-sm text-muted-foreground mb-2">
+              <strong>Descreva a peça de roupa que você deseja criar:</strong>
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Inclua detalhes como: tipo da peça, cor, estilo, tecido, padrões, detalhes especiais.
+              Exemplo: "Camiseta feminina de algodão na cor azul marinho, gola redonda, manga curta, 
+              com estampa minimalista de montanhas brancas no peito, corte reto, tecido leve"
+            </p>
+          </div>
+
+          <div>
+            <Label>Descrição Completa da Peça</Label>
+            <Textarea
+              value={characteristics.description}
+              onChange={(e) => setCharacteristics({ description: e.target.value })}
+              placeholder="Ex: Vestido midi floral de viscose, cor predominante rosa claro com flores pequenas coloridas, decote V, manga bufante 3/4, cintura marcada com cinto fino incluso, saia evasê..."
+              rows={6}
+              className="resize-none"
+            />
+          </div>
+
+          <Button onClick={handleGenerate} disabled={loading} className="w-full">
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Gerando Peça...
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Gerar Peça com IA
+              </>
+            )}
+          </Button>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

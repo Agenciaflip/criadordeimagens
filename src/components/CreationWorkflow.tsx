@@ -120,6 +120,35 @@ export const CreationWorkflow = () => {
           
           if (creationData) {
             setGeneratedCreationId(creationData.id);
+            
+            // Auto-gerar título e descrição para marketplace
+            try {
+              const contentResponse = await supabase.functions.invoke('generate-marketplace-content', {
+                body: {
+                  clothingName: clothingCharacteristics?.description || "Peça de roupa",
+                  clothingType: "peça personalizada",
+                  clothingStyle: sceneSettings.style,
+                  clothingColor: "conforme imagem"
+                }
+              });
+              
+              if (contentResponse.data) {
+                const { title: generatedTitle, description: generatedDescription } = contentResponse.data;
+                setTitle(generatedTitle);
+                setDescription(generatedDescription);
+                
+                // Atualizar no banco imediatamente
+                await supabase.from("creations").update({
+                  title: generatedTitle,
+                  description: generatedDescription
+                }).eq("id", creationData.id);
+                
+                toast.success("Título e descrição gerados automaticamente!");
+              }
+            } catch (contentError: any) {
+              console.error("Erro ao gerar conteúdo:", contentError);
+              // Não bloquear o fluxo se falhar
+            }
           }
         }
         

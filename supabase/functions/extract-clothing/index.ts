@@ -11,23 +11,22 @@ serve(async (req) => {
   }
 
   try {
-    const { characteristics } = await req.json();
+    const { imageUrl } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
-    console.log('Gerando peça com características:', characteristics);
+    console.log('Extraindo peça de roupa da imagem...');
 
-    const prompt = `Ultra high resolution professional fashion product photography.
-Create a clothing item based on this description: ${characteristics.description}
-The clothing should be displayed on a hanger or mannequin against a pure white background.
-Professional studio lighting, centered composition.
-High quality, detailed, realistic product photography suitable for e-commerce.
-Make sure all details from the description are visible and well-represented.`;
-
-    console.log('Prompt gerado:', prompt);
+    const prompt = `Extract and isolate the clothing item from this image.
+Remove the model, mannequin, or any person wearing it.
+Display the clothing item on a hanger against a pure white background.
+The clothing should be centered, well-lit with professional studio lighting.
+Maintain all details, textures, colors, and characteristics of the original clothing.
+The result should look like a professional product photography for e-commerce.
+Ultra high resolution, clean, professional.`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -40,7 +39,10 @@ Make sure all details from the description are visible and well-represented.`;
         messages: [
           {
             role: 'user',
-            content: prompt
+            content: [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: imageUrl } }
+            ]
           }
         ],
         modalities: ['image', 'text']
@@ -50,27 +52,20 @@ Make sure all details from the description are visible and well-represented.`;
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Erro na API:', response.status, errorText);
-      
-      if (response.status === 429) {
-        throw new Error('Rate limit');
-      } else if (response.status === 402) {
-        throw new Error('Payment required');
-      }
-      
-      throw new Error('Failed to generate image');
+      throw new Error('Failed to extract clothing');
     }
 
     const data = await response.json();
-    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    const extractedImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
-    if (!imageUrl) {
+    if (!extractedImageUrl) {
       throw new Error('No image generated');
     }
 
-    console.log('Peça gerada com sucesso!');
+    console.log('Peça extraída com sucesso!');
 
     return new Response(
-      JSON.stringify({ imageUrl }),
+      JSON.stringify({ imageUrl: extractedImageUrl }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200 

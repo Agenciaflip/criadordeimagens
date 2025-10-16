@@ -70,7 +70,9 @@ Professional product photography, white background.`;
     console.log(`${variations.length} variações geradas com sucesso`);
 
     return new Response(
-      JSON.stringify({ variations }),
+      JSON.stringify({ 
+        variations: variations.map(v => v.imageUrl)
+      }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200 

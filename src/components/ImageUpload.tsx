@@ -1,100 +1,93 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { Upload, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface ImageUploadProps {
-  onImageSelect: (imageData: string) => void;
-  label: string;
-  currentImage?: string;
+  onImageSelect: (imageUrl: string) => void;
+  label?: string;
+  accept?: string;
 }
 
-export const ImageUpload = ({ onImageSelect, label, currentImage }: ImageUploadProps) => {
-  const [isDragging, setIsDragging] = useState(false);
+export const ImageUpload = ({ onImageSelect, label = "Fazer Upload de Imagem", accept = "image/*" }: ImageUploadProps) => {
+  const [preview, setPreview] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    
-    const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) {
-      handleFile(file);
-    }
-  };
-
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      handleFile(file);
-    }
-  };
+    if (!file) return;
 
-  const handleFile = (file: File) => {
+    // Validar tipo de arquivo
+    if (!file.type.startsWith('image/')) {
+      toast.error("Por favor, selecione uma imagem válida");
+      return;
+    }
+
+    // Validar tamanho (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Imagem muito grande. Máximo 10MB");
+      return;
+    }
+
     const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      setPreview(result);
       onImageSelect(result);
+      toast.success("Imagem carregada com sucesso");
     };
     reader.readAsDataURL(file);
   };
 
-  const clearImage = () => {
-    onImageSelect("");
+  const handleClear = () => {
+    setPreview("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   return (
-    <div className="space-y-2">
-      <label className="text-sm font-medium text-foreground">{label}</label>
-      <div
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        className={cn(
-          "relative overflow-hidden rounded-xl border-2 border-dashed transition-all duration-300",
-          isDragging 
-            ? "border-primary bg-primary/10 scale-[1.02]" 
-            : "border-border bg-secondary/50 hover:border-primary/50",
-          currentImage ? "aspect-square" : "aspect-video"
-        )}
-      >
-        {currentImage ? (
-          <div className="relative w-full h-full group">
-            <img 
-              src={currentImage} 
-              alt="Preview" 
-              className="w-full h-full object-cover"
-            />
-            <button
-              onClick={clearImage}
-              className="absolute top-2 right-2 p-2 rounded-full bg-destructive/90 text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-destructive"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        ) : (
-          <label className="flex flex-col items-center justify-center w-full h-full cursor-pointer p-8">
-            <Upload className="w-12 h-12 mb-4 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground text-center">
-              Arraste e solte ou <span className="text-primary font-medium">clique para fazer upload</span>
-            </p>
-            <p className="text-xs text-muted-foreground mt-2">PNG, JPG, WEBP</p>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFileInput}
-              className="hidden"
-            />
-          </label>
-        )}
-      </div>
+    <div className="space-y-4">
+      <Label>{label}</Label>
+      
+      {!preview ? (
+        <div 
+          onClick={() => fileInputRef.current?.click()}
+          className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-colors"
+        >
+          <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground mb-2">
+            Clique para fazer upload ou arraste a imagem
+          </p>
+          <p className="text-xs text-muted-foreground">
+            PNG, JPG, WEBP até 10MB
+          </p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={accept}
+            onChange={handleFileChange}
+            className="hidden"
+          />
+        </div>
+      ) : (
+        <div className="relative">
+          <img 
+            src={preview} 
+            alt="Preview" 
+            className="w-full rounded-lg border border-border"
+          />
+          <Button
+            size="icon"
+            variant="destructive"
+            className="absolute top-2 right-2"
+            onClick={handleClear}
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
