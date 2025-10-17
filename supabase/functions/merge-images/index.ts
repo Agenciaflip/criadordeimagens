@@ -24,9 +24,9 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      console.error('LOVABLE_API_KEY not configured');
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+    if (!GEMINI_API_KEY) {
+      console.error('GEMINI_API_KEY not configured');
       return new Response(
         JSON.stringify({ error: 'AI service not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -90,61 +90,60 @@ serve(async (req) => {
     
     console.log('Generated prompt:', mergePrompt);
 
-    console.log('Calling Lovable AI for image generation...');
+    console.log('Calling Google Gemini for image generation...');
+
+    // Convert images to base64 if needed
+    const getImageBase64 = async (imgUrl: string) => {
+      if (imgUrl.startsWith('data:image')) {
+        return imgUrl.split(',')[1];
+      }
+      const imgResponse = await fetch(imgUrl);
+      const imgBlob = await imgResponse.blob();
+      const buffer = await imgBlob.arrayBuffer();
+      return btoa(String.fromCharCode(...new Uint8Array(buffer)));
+    };
+
+    const modelImageData = await getImageBase64(modelImage);
+    const productImageData = await getImageBase64(productImage);
     
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-image-preview',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: mergePrompt
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: modelImage
-                }
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: productImage
-                }
+        contents: [{
+          parts: [
+            {
+              text: mergePrompt
+            },
+            {
+              inlineData: {
+                mimeType: "image/jpeg",
+                data: modelImageData
               }
-            ]
-          }
-        ],
-        modalities: ['image', 'text']
+            },
+            {
+              inlineData: {
+                mimeType: "image/jpeg",
+                data: productImageData
+              }
+            }
+          ]
+        }],
+        generationConfig: {
+          temperature: 1,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 8192,
+          responseMimeType: "image/jpeg"
+        }
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('AI gateway error:', response.status, errorText);
-      
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: 'Payment required. Please add credits to your workspace.' }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
+      console.error('Gemini API error:', response.status, errorText);
       return new Response(
         JSON.stringify({ error: 'Failed to generate merged image' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -152,17 +151,19 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    console.log('AI response received');
+    console.log('Gemini response received');
     
-    const mergedImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    const imageData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
     
-    if (!mergedImageUrl) {
-      console.error('No image in AI response');
+    if (!imageData) {
+      console.error('No image in Gemini response');
       return new Response(
         JSON.stringify({ error: 'No image generated' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const mergedImageUrl = `data:image/jpeg;base64,${imageData}`;
 
     console.log('Image merge completed successfully');
     

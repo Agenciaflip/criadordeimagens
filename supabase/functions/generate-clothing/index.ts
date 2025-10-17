@@ -12,10 +12,10 @@ serve(async (req) => {
 
   try {
     const { characteristics } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
 
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    if (!GEMINI_API_KEY) {
+      throw new Error('GEMINI_API_KEY not configured');
     }
 
     console.log('Gerando peça com características:', characteristics);
@@ -29,43 +29,41 @@ Make sure all details from the description are visible and well-represented.`;
 
     console.log('Prompt gerado:', prompt);
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-image-preview',
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        modalities: ['image', 'text']
+        contents: [{
+          parts: [{
+            text: prompt
+          }]
+        }],
+        generationConfig: {
+          temperature: 1,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 8192,
+          responseMimeType: "image/jpeg"
+        }
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Erro na API:', response.status, errorText);
-      
-      if (response.status === 429) {
-        throw new Error('Rate limit');
-      } else if (response.status === 402) {
-        throw new Error('Payment required');
-      }
-      
+      console.error('Erro na API Gemini:', response.status, errorText);
       throw new Error('Failed to generate image');
     }
 
     const data = await response.json();
-    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    const imageData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
 
-    if (!imageUrl) {
+    if (!imageData) {
       throw new Error('No image generated');
     }
+
+    const imageUrl = `data:image/jpeg;base64,${imageData}`;
 
     console.log('Peça gerada com sucesso!');
 

@@ -12,10 +12,10 @@ serve(async (req) => {
 
   try {
     const { creationImage, selectedColors } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
 
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    if (!GEMINI_API_KEY) {
+      throw new Error('GEMINI_API_KEY not configured');
     }
 
     if (!selectedColors || selectedColors.length === 0) {
@@ -23,6 +23,18 @@ serve(async (req) => {
     }
 
     console.log(`Gerando ${selectedColors.length} variações de cor...`);
+
+    // Convert image to base64 once
+    let imageData = creationImage;
+    if (creationImage.startsWith('http')) {
+      const imageResponse = await fetch(creationImage);
+      const imageBlob = await imageResponse.blob();
+      const buffer = await imageBlob.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+      imageData = base64;
+    } else if (creationImage.startsWith('data:image')) {
+      imageData = creationImage.split(',')[1];
+    }
 
     const variations = [];
 
@@ -38,43 +50,46 @@ Keep everything else identical:
 ONLY the clothing color should change to ${color}.
 The result must look like the exact same photo, just with the clothing in ${color} color.`;
 
-      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.5-flash-image-preview',
-          messages: [
-            {
-              role: 'user',
-              content: [
-                { type: 'text', text: prompt },
-                { type: 'image_url', image_url: { url: creationImage } }
-              ]
-            }
-          ],
-          modalities: ['image', 'text']
+          contents: [{
+            parts: [
+              {
+                text: prompt
+              },
+              {
+                inlineData: {
+                  mimeType: "image/jpeg",
+                  data: imageData
+                }
+              }
+            ]
+          }],
+          generationConfig: {
+            temperature: 1,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 8192,
+            responseMimeType: "image/jpeg"
+          }
         }),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`Erro na variação ${color}:`, response.status, errorText);
-        
-        if (response.status === 429) {
-          throw new Error('Rate limit exceeded');
-        } else if (response.status === 402) {
-          throw new Error('Payment required');
-        }
         continue;
       }
 
       const data = await response.json();
-      const variationUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+      const variationData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
 
-      if (variationUrl) {
+      if (variationData) {
+        const variationUrl = `data:image/jpeg;base64,${variationData}`;
         variations.push(variationUrl);
         console.log(`Variação ${color} gerada com sucesso`);
       }

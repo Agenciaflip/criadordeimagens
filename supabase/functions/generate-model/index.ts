@@ -15,9 +15,9 @@ serve(async (req) => {
     
     console.log('Gerando modelo com características:', { gender, ethnicity, ageRange, bodyType, hairColor, hairStyle, skinTone });
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY não está configurada');
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+    if (!GEMINI_API_KEY) {
+      throw new Error('GEMINI_API_KEY não está configurada');
     }
 
     // Criar prompt detalhado baseado nas características
@@ -31,49 +31,41 @@ High quality, detailed, realistic, professional fashion photography.`;
 
     console.log('Prompt gerado:', prompt);
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-image-preview',
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        modalities: ['image', 'text']
+        contents: [{
+          parts: [{
+            text: prompt
+          }]
+        }],
+        generationConfig: {
+          temperature: 1,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 8192,
+          responseMimeType: "image/jpeg"
+        }
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Erro da API:', response.status, errorText);
-      
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: 'Rate limit exceeded' }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      } else if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: 'Payment required' }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
+      console.error('Erro da API Gemini:', response.status, errorText);
       throw new Error(`Erro ao gerar imagem: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    const generatedImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    const imageData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
 
-    if (!generatedImageUrl) {
+    if (!imageData) {
       throw new Error('Nenhuma imagem foi gerada pela API');
     }
+
+    const generatedImageUrl = `data:image/jpeg;base64,${imageData}`;
 
     console.log('Modelo gerado com sucesso!');
 

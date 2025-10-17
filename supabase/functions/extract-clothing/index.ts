@@ -12,10 +12,10 @@ serve(async (req) => {
 
   try {
     const { imageUrl } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
 
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    if (!GEMINI_API_KEY) {
+      throw new Error('GEMINI_API_KEY not configured');
     }
 
     console.log('Extraindo peça de roupa da imagem...');
@@ -28,39 +28,61 @@ Maintain all details, textures, colors, and characteristics of the original clot
 The result should look like a professional product photography for e-commerce.
 Ultra high resolution, clean, professional.`;
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    // Convert image to base64 if needed
+    let imageData = imageUrl;
+    if (imageUrl.startsWith('http')) {
+      const imageResponse = await fetch(imageUrl);
+      const imageBlob = await imageResponse.blob();
+      const buffer = await imageBlob.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+      imageData = base64;
+    } else if (imageUrl.startsWith('data:image')) {
+      imageData = imageUrl.split(',')[1];
+    }
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-image-preview',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: prompt },
-              { type: 'image_url', image_url: { url: imageUrl } }
-            ]
-          }
-        ],
-        modalities: ['image', 'text']
+        contents: [{
+          parts: [
+            {
+              text: prompt
+            },
+            {
+              inlineData: {
+                mimeType: "image/jpeg",
+                data: imageData
+              }
+            }
+          ]
+        }],
+        generationConfig: {
+          temperature: 1,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 8192,
+          responseMimeType: "image/jpeg"
+        }
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Erro na API:', response.status, errorText);
+      console.error('Erro na API Gemini:', response.status, errorText);
       throw new Error('Failed to extract clothing');
     }
 
     const data = await response.json();
-    const extractedImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    const extractedImageData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
 
-    if (!extractedImageUrl) {
+    if (!extractedImageData) {
       throw new Error('No image generated');
     }
+
+    const extractedImageUrl = `data:image/jpeg;base64,${extractedImageData}`;
 
     console.log('Peça extraída com sucesso!');
 

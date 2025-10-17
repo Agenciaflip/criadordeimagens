@@ -21,12 +21,12 @@ serve(async (req) => {
 
   try {
     const { creationId } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    if (!GEMINI_API_KEY) {
+      throw new Error('GEMINI_API_KEY not configured');
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -45,6 +45,18 @@ serve(async (req) => {
     const originalImageUrl = creation.image_url;
     console.log('Gerando pack de 5 poses...');
 
+    // Convert image to base64 once
+    let imageData = originalImageUrl;
+    if (originalImageUrl.startsWith('http')) {
+      const imageResponse = await fetch(originalImageUrl);
+      const imageBlob = await imageResponse.blob();
+      const buffer = await imageBlob.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+      imageData = base64;
+    } else if (originalImageUrl.startsWith('data:image')) {
+      imageData = originalImageUrl.split(',')[1];
+    }
+
     const poseImages = [];
 
     for (const pose of poses) {
@@ -55,43 +67,46 @@ Maintain the same model appearance.
 Professional fashion photography, studio lighting, neutral background.
 High quality, detailed, realistic, professional.`;
 
-      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.5-flash-image-preview',
-          messages: [
-            {
-              role: 'user',
-              content: [
-                { type: 'text', text: fullPrompt },
-                { type: 'image_url', image_url: { url: originalImageUrl } }
-              ]
-            }
-          ],
-          modalities: ['image', 'text']
+          contents: [{
+            parts: [
+              {
+                text: fullPrompt
+              },
+              {
+                inlineData: {
+                  mimeType: "image/jpeg",
+                  data: imageData
+                }
+              }
+            ]
+          }],
+          generationConfig: {
+            temperature: 1,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 8192,
+            responseMimeType: "image/jpeg"
+          }
         }),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`Erro na pose ${pose.name}:`, response.status, errorText);
-        
-        if (response.status === 429) {
-          throw new Error('Rate limit exceeded');
-        } else if (response.status === 402) {
-          throw new Error('Payment required');
-        }
         continue;
       }
 
       const data = await response.json();
-      const poseImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+      const poseImageData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
 
-      if (poseImageUrl) {
+      if (poseImageData) {
+        const poseImageUrl = `data:image/jpeg;base64,${poseImageData}`;
         poseImages.push(poseImageUrl);
         console.log(`Pose ${pose.name} gerada com sucesso`);
       }
