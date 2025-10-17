@@ -516,7 +516,7 @@ export const CreationWorkflow = () => {
       <ColorVariationsGenerator
         open={showColorVariations}
         onOpenChange={setShowColorVariations}
-        clothingImage={clothingImage}
+        creationImage={generatedImage}
       />
 
       <PosePackGenerator

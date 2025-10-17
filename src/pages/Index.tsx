@@ -106,7 +106,7 @@ const Index = () => {
           <ColorVariationsGenerator
             open={showColorVariations}
             onOpenChange={setShowColorVariations}
-            clothingImage={selectedCreation.image_url}
+            creationImage={selectedCreation.image_url}
           />
 
           <PosePackGenerator

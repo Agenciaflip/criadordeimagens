@@ -7,11 +7,11 @@ const corsHeaders = {
 };
 
 const poses = [
-  { name: 'frontal', prompt: 'Full frontal view, model facing camera directly, standing straight' },
-  { name: 'costas', prompt: 'Full back view, model with back to camera, showing rear of clothing' },
-  { name: 'perfil', prompt: 'Side profile view, model turned 90 degrees, showing side of clothing' },
-  { name: 'detalhe_superior', prompt: 'Close-up detail shot focusing on upper section of clothing, high detail' },
-  { name: 'detalhe_inferior', prompt: 'Close-up detail shot focusing on lower section of clothing, high detail' },
+  { name: 'frontal', prompt: 'Full frontal view, model facing camera directly, standing straight, full body visible' },
+  { name: 'costas', prompt: 'Full back view, model with back to camera, showing rear of clothing, full body visible' },
+  { name: 'perfil', prompt: 'Side profile view, model turned 90 degrees showing side of clothing, full body visible' },
+  { name: 'macro_detalhe', prompt: 'Extreme close-up macro shot showing fabric texture and clothing details, focus on material quality and craftsmanship' },
+  { name: '3_4_angle', prompt: '3/4 angle view, model positioned at 45 degrees, showing both front and side, full body visible' },
 ];
 
 serve(async (req) => {
@@ -48,10 +48,12 @@ serve(async (req) => {
     const poseImages = [];
 
     for (const pose of poses) {
-      const fullPrompt = `${pose.prompt}. 
-Maintain the same model and clothing as shown in the reference image.
-Professional fashion photography, studio lighting, clean background.
-High quality, detailed, realistic.`;
+      const fullPrompt = `Generate a new photo with this exact specification: ${pose.prompt}.
+Use the same model and same clothing as shown in the reference image.
+Maintain the same clothing design, color, and style.
+Maintain the same model appearance.
+Professional fashion photography, studio lighting, neutral background.
+High quality, detailed, realistic, professional.`;
 
       const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
@@ -75,7 +77,14 @@ High quality, detailed, realistic.`;
       });
 
       if (!response.ok) {
-        console.error(`Erro na pose ${pose.name}:`, response.status);
+        const errorText = await response.text();
+        console.error(`Erro na pose ${pose.name}:`, response.status, errorText);
+        
+        if (response.status === 429) {
+          throw new Error('Rate limit exceeded');
+        } else if (response.status === 402) {
+          throw new Error('Payment required');
+        }
         continue;
       }
 
@@ -83,19 +92,15 @@ High quality, detailed, realistic.`;
       const poseImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
       if (poseImageUrl) {
-        poseImages.push({
-          pose: pose.name,
-          imageUrl: poseImageUrl
-        });
+        poseImages.push(poseImageUrl);
+        console.log(`Pose ${pose.name} gerada com sucesso`);
       }
     }
 
     console.log(`${poseImages.length} poses geradas com sucesso`);
 
     return new Response(
-      JSON.stringify({ 
-        poses: poseImages.map(p => p.imageUrl)
-      }),
+      JSON.stringify({ poses: poseImages }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200 

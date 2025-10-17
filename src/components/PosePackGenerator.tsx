@@ -21,10 +21,10 @@ export const PosePackGenerator = ({
 
   const poseNames = [
     "Vista Frontal",
-    "Vista Traseira",
+    "Vista Traseira", 
     "Perfil Lateral",
-    "Detalhe Superior",
-    "Detalhe Inferior"
+    "Macro Detalhe",
+    "Ângulo 3/4"
   ];
 
   const handleGenerate = async () => {
