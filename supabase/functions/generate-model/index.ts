@@ -16,8 +16,13 @@ serve(async (req) => {
     console.log('Gerando modelo com características:', { gender, ethnicity, ageRange, bodyType, hairColor, hairStyle, skinTone });
 
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+    const GOOGLE_CLOUD_PROJECT_ID = Deno.env.get('GOOGLE_CLOUD_PROJECT_ID');
+    
     if (!GEMINI_API_KEY) {
       throw new Error('GEMINI_API_KEY não está configurada');
+    }
+    if (!GOOGLE_CLOUD_PROJECT_ID) {
+      throw new Error('GOOGLE_CLOUD_PROJECT_ID não está configurado');
     }
 
     // Criar prompt detalhado baseado nas características
@@ -31,35 +36,36 @@ High quality, detailed, realistic, professional fashion photography.`;
 
     console.log('Prompt gerado:', prompt);
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: prompt
-          }]
-        }],
-        generationConfig: {
-          temperature: 1,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 8192,
-          responseMimeType: "image/jpeg"
-        }
-      }),
-    });
+    const response = await fetch(
+      `https://us-central1-aiplatform.googleapis.com/v1/projects/${GOOGLE_CLOUD_PROJECT_ID}/locations/us-central1/publishers/google/models/imagen-3.0-generate-001:predict`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${GEMINI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          instances: [{
+            prompt: prompt
+          }],
+          parameters: {
+            sampleCount: 1,
+            aspectRatio: "3:4",
+            safetyFilterLevel: "block_some",
+            personGeneration: "allow_adult"
+          }
+        }),
+      }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Erro da API Gemini:', response.status, errorText);
+      console.error('Erro da API Vertex AI:', response.status, errorText);
       throw new Error(`Erro ao gerar imagem: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    const imageData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    const imageData = data.predictions?.[0]?.bytesBase64Encoded;
 
     if (!imageData) {
       throw new Error('Nenhuma imagem foi gerada pela API');

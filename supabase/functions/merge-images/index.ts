@@ -25,6 +25,8 @@ serve(async (req) => {
     }
 
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+    const GOOGLE_CLOUD_PROJECT_ID = Deno.env.get('GOOGLE_CLOUD_PROJECT_ID');
+    
     if (!GEMINI_API_KEY) {
       console.error('GEMINI_API_KEY not configured');
       return new Response(
@@ -32,9 +34,16 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    if (!GOOGLE_CLOUD_PROJECT_ID) {
+      console.error('GOOGLE_CLOUD_PROJECT_ID not configured');
+      return new Response(
+        JSON.stringify({ error: 'Google Cloud not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Build dynamic prompt based on scene settings
-    let mergePrompt = 'Professional fashion photography. ';
+    let mergePrompt = 'Professional fashion photography showing a model wearing the clothing item. ';
     
     if (sceneSettings) {
       const { pose, scenario, lighting, style } = sceneSettings;
@@ -86,11 +95,11 @@ serve(async (req) => {
       }
     }
     
-    mergePrompt += prompt || 'Merge the clothing item onto the model seamlessly. Ensure realistic fit, proper lighting, shadows, and perspective. The result should look natural and professional.';
+    mergePrompt += prompt || 'The model should be wearing the clothing item naturally. Ensure realistic fit, proper lighting, shadows, and perspective. The result should look natural and professional. High quality, detailed, realistic.';
     
     console.log('Generated prompt:', mergePrompt);
 
-    console.log('Calling Google Gemini for image generation...');
+    console.log('Calling Vertex AI Imagen for image editing...');
 
     // Convert images to base64 if needed
     const getImageBase64 = async (imgUrl: string) => {
@@ -104,46 +113,37 @@ serve(async (req) => {
     };
 
     const modelImageData = await getImageBase64(modelImage);
-    const productImageData = await getImageBase64(productImage);
     
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            {
-              text: mergePrompt
-            },
-            {
-              inlineData: {
-                mimeType: "image/jpeg",
-                data: modelImageData
-              }
-            },
-            {
-              inlineData: {
-                mimeType: "image/jpeg",
-                data: productImageData
-              }
+    // For Vertex AI Imagen edit, we use the model as base image and describe the product in prompt
+    const response = await fetch(
+      `https://us-central1-aiplatform.googleapis.com/v1/projects/${GOOGLE_CLOUD_PROJECT_ID}/locations/us-central1/publishers/google/models/imagegeneration@006:predict`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${GEMINI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          instances: [{
+            prompt: mergePrompt,
+            image: {
+              bytesBase64Encoded: modelImageData
             }
-          ]
-        }],
-        generationConfig: {
-          temperature: 1,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 8192,
-          responseMimeType: "image/jpeg"
-        }
-      }),
-    });
+          }],
+          parameters: {
+            sampleCount: 1,
+            mode: "image-generation",
+            aspectRatio: "3:4",
+            safetyFilterLevel: "block_some",
+            personGeneration: "allow_adult"
+          }
+        }),
+      }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Gemini API error:', response.status, errorText);
+      console.error('Vertex AI error:', response.status, errorText);
       return new Response(
         JSON.stringify({ error: 'Failed to generate merged image' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -151,12 +151,12 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    console.log('Gemini response received');
+    console.log('Vertex AI response received');
     
-    const imageData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    const imageData = data.predictions?.[0]?.bytesBase64Encoded;
     
     if (!imageData) {
-      console.error('No image in Gemini response');
+      console.error('No image in Vertex AI response');
       return new Response(
         JSON.stringify({ error: 'No image generated' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

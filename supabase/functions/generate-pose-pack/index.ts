@@ -22,11 +22,15 @@ serve(async (req) => {
   try {
     const { creationId } = await req.json();
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+    const GOOGLE_CLOUD_PROJECT_ID = Deno.env.get('GOOGLE_CLOUD_PROJECT_ID');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
     if (!GEMINI_API_KEY) {
       throw new Error('GEMINI_API_KEY not configured');
+    }
+    if (!GOOGLE_CLOUD_PROJECT_ID) {
+      throw new Error('GOOGLE_CLOUD_PROJECT_ID not configured');
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -67,34 +71,31 @@ Maintain the same model appearance.
 Professional fashion photography, studio lighting, neutral background.
 High quality, detailed, realistic, professional.`;
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              {
-                text: fullPrompt
-              },
-              {
-                inlineData: {
-                  mimeType: "image/jpeg",
-                  data: imageData
-                }
+      const response = await fetch(
+        `https://us-central1-aiplatform.googleapis.com/v1/projects/${GOOGLE_CLOUD_PROJECT_ID}/locations/us-central1/publishers/google/models/imagegeneration@006:predict`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${GEMINI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            instances: [{
+              prompt: fullPrompt,
+              image: {
+                bytesBase64Encoded: imageData
               }
-            ]
-          }],
-          generationConfig: {
-            temperature: 1,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 8192,
-            responseMimeType: "image/jpeg"
-          }
-        }),
-      });
+            }],
+            parameters: {
+              sampleCount: 1,
+              mode: "image-generation",
+              aspectRatio: "3:4",
+              safetyFilterLevel: "block_some",
+              personGeneration: "allow_adult"
+            }
+          }),
+        }
+      );
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -103,7 +104,7 @@ High quality, detailed, realistic, professional.`;
       }
 
       const data = await response.json();
-      const poseImageData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      const poseImageData = data.predictions?.[0]?.bytesBase64Encoded;
 
       if (poseImageData) {
         const poseImageUrl = `data:image/jpeg;base64,${poseImageData}`;

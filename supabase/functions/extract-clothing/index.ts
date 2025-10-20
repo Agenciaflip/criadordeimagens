@@ -13,9 +13,13 @@ serve(async (req) => {
   try {
     const { imageUrl } = await req.json();
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+    const GOOGLE_CLOUD_PROJECT_ID = Deno.env.get('GOOGLE_CLOUD_PROJECT_ID');
 
     if (!GEMINI_API_KEY) {
       throw new Error('GEMINI_API_KEY not configured');
+    }
+    if (!GOOGLE_CLOUD_PROJECT_ID) {
+      throw new Error('GOOGLE_CLOUD_PROJECT_ID not configured');
     }
 
     console.log('Extraindo peça de roupa da imagem...');
@@ -40,43 +44,39 @@ Ultra high resolution, clean, professional.`;
       imageData = imageUrl.split(',')[1];
     }
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            {
-              text: prompt
-            },
-            {
-              inlineData: {
-                mimeType: "image/jpeg",
-                data: imageData
-              }
+    const response = await fetch(
+      `https://us-central1-aiplatform.googleapis.com/v1/projects/${GOOGLE_CLOUD_PROJECT_ID}/locations/us-central1/publishers/google/models/imagegeneration@006:predict`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${GEMINI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          instances: [{
+            prompt: prompt,
+            image: {
+              bytesBase64Encoded: imageData
             }
-          ]
-        }],
-        generationConfig: {
-          temperature: 1,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 8192,
-          responseMimeType: "image/jpeg"
-        }
-      }),
-    });
+          }],
+          parameters: {
+            sampleCount: 1,
+            mode: "image-generation",
+            aspectRatio: "1:1",
+            safetyFilterLevel: "block_some"
+          }
+        }),
+      }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Erro na API Gemini:', response.status, errorText);
+      console.error('Erro na API Vertex AI:', response.status, errorText);
       throw new Error('Failed to extract clothing');
     }
 
     const data = await response.json();
-    const extractedImageData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    const extractedImageData = data.predictions?.[0]?.bytesBase64Encoded;
 
     if (!extractedImageData) {
       throw new Error('No image generated');
